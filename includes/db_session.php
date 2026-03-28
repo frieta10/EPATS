@@ -1,7 +1,7 @@
 <?php
 // ============================================================
-// Database-backed PHP Session Handler
-// Required for Vercel (no shared filesystem between invocations)
+// Database-backed PHP Session Handler (PostgreSQL)
+// Required for Vercel — no shared filesystem between invocations
 // ============================================================
 
 class DbSessionHandler implements SessionHandlerInterface {
@@ -22,7 +22,8 @@ class DbSessionHandler implements SessionHandlerInterface {
 
     public function read(string $id): string|false {
         $stmt = $this->db->prepare(
-            'SELECT session_data FROM php_sessions WHERE session_id = ? AND expires_at > NOW()'
+            "SELECT session_data FROM php_sessions
+             WHERE session_id = ? AND expires_at > NOW()"
         );
         $stmt->execute([$id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -31,11 +32,11 @@ class DbSessionHandler implements SessionHandlerInterface {
 
     public function write(string $id, string $data): bool {
         $stmt = $this->db->prepare(
-            'INSERT INTO php_sessions (session_id, session_data, expires_at)
-             VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 2 HOUR))
-             ON DUPLICATE KEY UPDATE
-               session_data = VALUES(session_data),
-               expires_at   = VALUES(expires_at)'
+            "INSERT INTO php_sessions (session_id, session_data, expires_at)
+             VALUES (?, ?, NOW() + INTERVAL '2 hours')
+             ON CONFLICT (session_id) DO UPDATE SET
+               session_data = EXCLUDED.session_data,
+               expires_at   = EXCLUDED.expires_at"
         );
         return $stmt->execute([$id, $data]);
     }
@@ -46,7 +47,7 @@ class DbSessionHandler implements SessionHandlerInterface {
     }
 
     public function gc(int $max_lifetime): int|false {
-        $stmt = $this->db->prepare('DELETE FROM php_sessions WHERE expires_at < NOW()');
+        $stmt = $this->db->prepare("DELETE FROM php_sessions WHERE expires_at < NOW()");
         $stmt->execute();
         return $stmt->rowCount();
     }
@@ -64,7 +65,6 @@ function startDbSession(): void {
         $handler = new DbSessionHandler(getDB());
         session_set_save_handler($handler, true);
 
-        // Secure cookie settings
         session_set_cookie_params([
             'lifetime' => 7200,
             'path'     => '/',

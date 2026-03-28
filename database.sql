@@ -1,106 +1,98 @@
--- E-Invitation Platform Database Schema
-CREATE DATABASE IF NOT EXISTS e_invitation CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE e_invitation;
+-- ============================================================
+-- E-Invitation Platform — PostgreSQL Schema
+-- Compatible with: Neon.tech, Supabase, Railway, any Postgres
+-- ============================================================
 
--- ============================================================
--- Settings table (all invitation customization)
--- ============================================================
+-- Settings table (all invitation customisation)
 CREATE TABLE IF NOT EXISTS settings (
-    id INT PRIMARY KEY AUTO_INCREMENT,
+    id          SERIAL PRIMARY KEY,
     setting_key VARCHAR(100) UNIQUE NOT NULL,
     setting_value TEXT,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- ============================================================
 -- Admin users
--- ============================================================
 CREATE TABLE IF NOT EXISTS admin_users (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    username VARCHAR(50) UNIQUE NOT NULL,
+    id            SERIAL PRIMARY KEY,
+    username      VARCHAR(50) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- ============================================================
--- Guest list (admin-created personalized invites)
--- ============================================================
+-- Guest list (admin-created personalised invites)
 CREATE TABLE IF NOT EXISTS guests (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(200) NOT NULL,
-    email VARCHAR(200),
-    phone VARCHAR(50),
+    id           SERIAL PRIMARY KEY,
+    name         VARCHAR(200) NOT NULL,
+    email        VARCHAR(200),
+    phone        VARCHAR(50),
     invite_token VARCHAR(64) UNIQUE NOT NULL,
     table_number VARCHAR(20),
-    notes TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    notes        TEXT,
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- ============================================================
 -- RSVP Responses
--- ============================================================
 CREATE TABLE IF NOT EXISTS rsvp_responses (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    guest_id INT NULL,
-    name VARCHAR(200) NOT NULL,
-    email VARCHAR(200),
-    phone VARCHAR(50),
-    attending ENUM('yes', 'no', 'maybe') NOT NULL DEFAULT 'yes',
-    plus_one TINYINT(1) DEFAULT 0,
-    plus_one_name VARCHAR(200),
+    id                   SERIAL PRIMARY KEY,
+    guest_id             INTEGER NULL REFERENCES guests(id) ON DELETE SET NULL,
+    name                 VARCHAR(200) NOT NULL,
+    email                VARCHAR(200),
+    phone                VARCHAR(50),
+    attending            VARCHAR(10) NOT NULL DEFAULT 'yes' CHECK (attending IN ('yes','no','maybe')),
+    plus_one             BOOLEAN DEFAULT FALSE,
+    plus_one_name        VARCHAR(200),
     dietary_requirements TEXT,
-    message TEXT,
-    city VARCHAR(100),
-    country VARCHAR(100),
-    lat DECIMAL(10, 8),
-    lng DECIMAL(11, 8),
-    qr_token VARCHAR(64) UNIQUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (guest_id) REFERENCES guests(id) ON DELETE SET NULL
+    message              TEXT,
+    city                 VARCHAR(100),
+    country              VARCHAR(100),
+    lat                  DECIMAL(10, 8),
+    lng                  DECIMAL(11, 8),
+    qr_token             VARCHAR(64) UNIQUE,
+    created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- ============================================================
 -- Time Capsule Wishes (unique feature)
--- ============================================================
 CREATE TABLE IF NOT EXISTS time_capsule (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    rsvp_id INT,
-    guest_name VARCHAR(200) NOT NULL,
-    message TEXT NOT NULL,
-    photo_path VARCHAR(255),
-    is_revealed TINYINT(1) DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (rsvp_id) REFERENCES rsvp_responses(id) ON DELETE CASCADE
+    id          SERIAL PRIMARY KEY,
+    rsvp_id     INTEGER REFERENCES rsvp_responses(id) ON DELETE CASCADE,
+    guest_name  VARCHAR(200) NOT NULL,
+    message     TEXT NOT NULL,
+    photo_path  VARCHAR(255),
+    is_revealed BOOLEAN DEFAULT FALSE,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- ============================================================
 -- Photo Gallery
--- ============================================================
 CREATE TABLE IF NOT EXISTS gallery (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    filename VARCHAR(255) NOT NULL,
-    original_name VARCHAR(255),
-    caption TEXT,
-    is_cover TINYINT(1) DEFAULT 0,
-    is_couple_photo TINYINT(1) DEFAULT 0,
-    display_order INT DEFAULT 0,
+    id              SERIAL PRIMARY KEY,
+    filename        VARCHAR(255) NOT NULL,
+    original_name   VARCHAR(255),
+    caption         TEXT,
+    is_cover        BOOLEAN DEFAULT FALSE,
+    is_couple_photo BOOLEAN DEFAULT FALSE,
+    display_order   INTEGER DEFAULT 0,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Guest Map Pins (for the "Journey Map" unique feature)
+CREATE TABLE IF NOT EXISTS map_pins (
+    id         SERIAL PRIMARY KEY,
+    rsvp_id    INTEGER REFERENCES rsvp_responses(id) ON DELETE CASCADE,
+    guest_name VARCHAR(200),
+    city       VARCHAR(100),
+    country    VARCHAR(100),
+    lat        DECIMAL(10, 8),
+    lng        DECIMAL(11, 8),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- ============================================================
--- Guest Map Pins (for the "Journey Map" unique feature)
--- ============================================================
-CREATE TABLE IF NOT EXISTS map_pins (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    rsvp_id INT,
-    guest_name VARCHAR(200),
-    city VARCHAR(100),
-    country VARCHAR(100),
-    lat DECIMAL(10, 8),
-    lng DECIMAL(11, 8),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (rsvp_id) REFERENCES rsvp_responses(id) ON DELETE CASCADE
+-- PHP Sessions table (required for Vercel / serverless)
+CREATE TABLE IF NOT EXISTS php_sessions (
+    session_id   VARCHAR(128) PRIMARY KEY,
+    session_data TEXT        NOT NULL,
+    expires_at   TIMESTAMP   NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_sessions_expires ON php_sessions (expires_at);
 
 -- ============================================================
 -- Default Settings
@@ -134,21 +126,11 @@ INSERT INTO settings (setting_key, setting_value) VALUES
 ('show_guest_garden',    '1'),
 ('site_password',        ''),
 ('admin_setup_done',     '0')
-ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value);
+ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value;
 
 -- ============================================================
--- Default Admin User (password set dynamically by setup.php)
+-- Default Admin User (password is set by setup.php at runtime)
 -- ============================================================
 INSERT INTO admin_users (username, password_hash) VALUES
-('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi')
-ON DUPLICATE KEY UPDATE username = username;
-
--- ============================================================
--- PHP Sessions table (required for Vercel / serverless)
--- ============================================================
-CREATE TABLE IF NOT EXISTS php_sessions (
-    session_id   VARCHAR(128) PRIMARY KEY,
-    session_data LONGTEXT     NOT NULL,
-    expires_at   DATETIME     NOT NULL,
-    INDEX idx_expires (expires_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+('admin', '$2y$10$placeholder.hash.will.be.replaced.by.setup.php')
+ON CONFLICT (username) DO NOTHING;

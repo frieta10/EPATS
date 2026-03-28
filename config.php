@@ -4,11 +4,13 @@
 // Supports both local (Laragon) and Vercel deployments
 // ============================================================
 
-// ── Database ──────────────────────────────────────────────
-define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
-define('DB_USER', getenv('DB_USER') ?: 'root');
-define('DB_PASS', getenv('DB_PASS') ?: '');
-define('DB_NAME', getenv('DB_NAME') ?: 'e_invitation');
+// ── Database (PostgreSQL) ─────────────────────────────────
+define('DB_HOST',    getenv('DB_HOST')     ?: 'localhost');
+define('DB_PORT',    getenv('DB_PORT')     ?: '5432');
+define('DB_USER',    getenv('DB_USER')     ?: 'postgres');
+define('DB_PASS',    getenv('DB_PASS')     ?: '');
+define('DB_NAME',    getenv('DB_NAME')     ?: 'e_invitation');
+define('DB_SSLMODE', getenv('DB_SSLMODE')  ?: 'prefer'); // use 'require' for Neon/Supabase
 
 // ── Base URL ──────────────────────────────────────────────
 // Vercel sets VERCEL_URL automatically (without protocol)
@@ -57,16 +59,16 @@ function getDB(): PDO {
     static $pdo = null;
     if ($pdo === null) {
         try {
-            $pdo = new PDO(
-                'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4',
-                DB_USER,
-                DB_PASS,
-                [
-                    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    PDO::ATTR_EMULATE_PREPARES   => false,
-                ]
+            $dsn = sprintf(
+                'pgsql:host=%s;port=%s;dbname=%s;sslmode=%s',
+                DB_HOST, DB_PORT, DB_NAME, DB_SSLMODE
             );
+            $pdo = new PDO($dsn, DB_USER, DB_PASS, [
+                PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES   => false,
+            ]);
+            $pdo->exec("SET client_encoding TO 'UTF8'");
         } catch (PDOException $e) {
             http_response_code(500);
             die('<div style="font-family:sans-serif;padding:40px;text-align:center;"><h2>Database Error</h2><p>Could not connect to the database. Please check your environment variables or run <code>setup.php</code> first.</p><pre>' . htmlspecialchars($e->getMessage()) . '</pre></div>');

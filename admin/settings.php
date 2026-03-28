@@ -17,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'color_bg','color_accent','color_text','custom_message',
             'music_url','music_autoplay','show_map','show_time_capsule','show_guest_garden'
         ];
-        $stmt = $db->prepare('INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)');
+        $stmt = $db->prepare('INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value');
         foreach ($fields as $field) {
             $val = $_POST[$field] ?? '';
             $stmt->execute([$field, $val]);
@@ -30,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!empty($_FILES['photo']) && in_array($type, ['cover_photo','couple_photo'])) {
             $filename = handleUpload($_FILES['photo'], $type);
             if ($filename) {
-                $db->prepare('INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)')
+                $db->prepare('INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value')
                    ->execute([$type, $filename]);
                 // Track in gallery
                 $db->prepare('INSERT INTO gallery (filename, original_name, caption, is_cover, is_couple_photo) VALUES (?, ?, ?, ?, ?)')

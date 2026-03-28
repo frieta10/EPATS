@@ -1,70 +1,90 @@
 <?php
 /**
- * One-time setup script — run this once to create the database tables.
- * Visit: http://localhost/E-Invitation/setup.php
+ * One-time setup script — run once to create all database tables.
+ * Visit: https://your-site.vercel.app/setup.php
  * Delete or rename this file after setup is complete.
  */
 
-define('DB_HOST', 'localhost');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_NAME', 'e_invitation');
+// Load env vars if running locally
+$envFile = __DIR__ . '/.env';
+if (file_exists($envFile)) {
+    foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        if (str_starts_with(trim($line), '#') || !str_contains($line, '=')) continue;
+        [$k, $v] = explode('=', $line, 2);
+        putenv(trim($k) . '=' . trim($v));
+    }
+}
+
+define('DB_HOST',    getenv('DB_HOST')    ?: 'localhost');
+define('DB_PORT',    getenv('DB_PORT')    ?: '5432');
+define('DB_USER',    getenv('DB_USER')    ?: 'postgres');
+define('DB_PASS',    getenv('DB_PASS')    ?: '');
+define('DB_NAME',    getenv('DB_NAME')    ?: 'e_invitation');
+define('DB_SSLMODE', getenv('DB_SSLMODE') ?: 'prefer');
 
 $log = [];
 $ok  = true;
 
 try {
-    // Connect without selecting a database first
-    $pdo = new PDO('mysql:host=' . DB_HOST . ';charset=utf8mb4', DB_USER, DB_PASS, [
+    $dsn = sprintf(
+        'pgsql:host=%s;port=%s;dbname=%s;sslmode=%s',
+        DB_HOST, DB_PORT, DB_NAME, DB_SSLMODE
+    );
+    $pdo = new PDO($dsn, DB_USER, DB_PASS, [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     ]);
+    $pdo->exec("SET client_encoding TO 'UTF8'");
+    $log[] = ['ok', 'Connected to PostgreSQL database: ' . DB_NAME];
 
-    // Create database
-    $pdo->exec("CREATE DATABASE IF NOT EXISTS `e_invitation` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-    $log[] = ['ok', 'Database `e_invitation` created / confirmed'];
-
-    $pdo->exec("USE `e_invitation`");
-
-    // Run the SQL file
+    // Run SQL file — split on semicolons and execute each statement
     $sql = file_get_contents(__DIR__ . '/database.sql');
-    // Strip USE / CREATE DATABASE lines (already done above)
-    $sql = preg_replace('/^\s*(CREATE DATABASE|USE)\b[^\n]+\n/im', '', $sql);
 
-    // Split on semicolons and execute each statement
+    // Remove single-line comments to avoid splitting on ";" in comments
+    $sql = preg_replace('/--[^\n]*\n/', "\n", $sql);
+
     $statements = array_filter(array_map('trim', explode(';', $sql)));
+    $count = 0;
     foreach ($statements as $stmt) {
         if ($stmt) {
             $pdo->exec($stmt);
+            $count++;
         }
     }
-    $log[] = ['ok', 'All tables created and default settings inserted'];
+    $log[] = ['ok', "Executed {$count} SQL statements — tables ready"];
 
-    // Always set the correct admin password hash (fixes static hash in SQL)
+    // Set correct admin password hash at runtime
     $correctHash = password_hash('admin123', PASSWORD_DEFAULT);
-    $pdo->prepare("INSERT INTO admin_users (username, password_hash) VALUES ('admin', ?) ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash)")
-        ->execute([$correctHash]);
+    $pdo->prepare(
+        "INSERT INTO admin_users (username, password_hash)
+         VALUES ('admin', ?)
+         ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash"
+    )->execute([$correctHash]);
     $log[] = ['ok', 'Admin credentials set (admin / admin123)'];
 
-    // Create uploads directory
-    $uploadsDir = __DIR__ . '/uploads';
-    if (!is_dir($uploadsDir)) {
-        mkdir($uploadsDir, 0755, true);
-        $log[] = ['ok', 'uploads/ directory created'];
+    // Create uploads dir for local dev
+    if (!IS_VERCEL) {
+        $uploadsDir = __DIR__ . '/uploads';
+        if (!is_dir($uploadsDir)) {
+            mkdir($uploadsDir, 0755, true);
+            $log[] = ['ok', 'uploads/ directory created'];
+        }
+        $htaccess = $uploadsDir . '/.htaccess';
+        if (!file_exists($htaccess)) {
+            file_put_contents($htaccess, "Options -Indexes\n<FilesMatch '\\.php$'>\n  Deny from all\n</FilesMatch>\n");
+            $log[] = ['ok', 'uploads/.htaccess written'];
+        }
     } else {
-        $log[] = ['ok', 'uploads/ directory already exists'];
-    }
-
-    // Write .htaccess for uploads security
-    $htaccess = $uploadsDir . '/.htaccess';
-    if (!file_exists($htaccess)) {
-        file_put_contents($htaccess, "Options -Indexes\n<FilesMatch '\\.php$'>\n  Deny from all\n</FilesMatch>\n");
-        $log[] = ['ok', 'uploads/.htaccess created (PHP execution blocked)'];
+        $log[] = ['ok', 'Vercel detected — skipping local uploads directory'];
     }
 
 } catch (PDOException $e) {
     $log[] = ['error', 'Database error: ' . $e->getMessage()];
     $ok = false;
 }
+
+// ── Detect base URL for buttons ──────────────────────────────
+$vercelUrl = getenv('VERCEL_URL');
+$baseUrl   = $vercelUrl ? 'https://' . $vercelUrl : '/';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -103,7 +123,7 @@ try {
     <div class="logo">
         <div class="icon">💍</div>
         <h1>E-Invitation Setup</h1>
-        <p>Database Installer</p>
+        <p>PostgreSQL Installer</p>
     </div>
 
     <div class="status-banner <?= $ok ? 'status-ok' : 'status-error' ?>">
@@ -130,8 +150,8 @@ try {
 
     <div class="actions">
         <?php if ($ok): ?>
-        <a href="/E-Invitation/" class="btn btn-primary">🎉 View Invitation</a>
-        <a href="/E-Invitation/admin/" class="btn btn-outline">🔒 Admin Portal</a>
+        <a href="<?= $baseUrl ?>" class="btn btn-primary">🎉 View Invitation</a>
+        <a href="<?= $baseUrl ?>admin/" class="btn btn-outline">🔒 Admin Portal</a>
         <?php else: ?>
         <a href="setup.php" class="btn btn-primary">↺ Retry Setup</a>
         <?php endif; ?>
