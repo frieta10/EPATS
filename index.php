@@ -40,7 +40,7 @@ $couplePhoto = !empty($s['couple_photo']) ? getImageUrl($s['couple_photo']) : ''
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=Montserrat:wght@300;400;500;600&family=Great+Vibes&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/main.css">
+<link rel="stylesheet" href="/assets/css/main.css">
 </head>
 <body>
 
@@ -93,9 +93,9 @@ $couplePhoto = !empty($s['couple_photo']) ? getImageUrl($s['couple_photo']) : ''
         </svg>
 
         <!-- Botanical leaf decorations -->
-        <div class="leaf leaf--tl"><img src="<?= BASE_URL ?>/assets/images/leaf-gold.svg" alt=""></div>
-        <div class="leaf leaf--tr"><img src="<?= BASE_URL ?>/assets/images/leaf-gold.svg" alt=""></div>
-        <div class="leaf leaf--bl"><img src="<?= BASE_URL ?>/assets/images/leaf-gold.svg" alt=""></div>
+        <div class="leaf leaf--tl"><img src="/assets/images/leaf-gold.svg" alt=""></div>
+        <div class="leaf leaf--tr"><img src="/assets/images/leaf-gold.svg" alt=""></div>
+        <div class="leaf leaf--bl"><img src="/assets/images/leaf-gold.svg" alt=""></div>
         <div class="pearl pearl--1"></div>
         <div class="pearl pearl--2"></div>
         <div class="pearl pearl--3"></div>
@@ -370,6 +370,6 @@ const BASE_URL = '<?= BASE_URL ?>';
 const EVENT_DATE = '<?= $eventDate ?>';
 const SHOW_MAP = <?= $s['show_map'] === '1' ? 'true' : 'false' ?>;
 </script>
-<script src="<?= BASE_URL ?>/assets/js/invitation.js"></script>
+<script src="/assets/js/invitation.js"></script>
 </body>
 </html>

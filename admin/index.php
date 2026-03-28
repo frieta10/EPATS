@@ -27,7 +27,7 @@ $byCountry = $db->query("SELECT country, COUNT(*) as cnt FROM rsvp_responses WHE
 <title>Dashboard — Admin Portal</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;1,400&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/admin.css">
+<link rel="stylesheet" href="/assets/css/admin.css">
 </head>
 <body class="admin-body">
 

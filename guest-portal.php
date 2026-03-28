@@ -41,8 +41,8 @@ $qrData    = BASE_URL . '/guest-portal.php?token=' . $token;
 <title>Your Invitation — <?= e($s['couple_name_1']) ?> &amp; <?= e($s['couple_name_2']) ?></title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=Montserrat:wght@300;400;500;600&family=Great+Vibes&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/main.css">
-<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/portal.css">
+<link rel="stylesheet" href="/assets/css/main.css">
+<link rel="stylesheet" href="/assets/css/portal.css">
 </head>
 <body class="portal-body">
 <canvas id="particleCanvas"></canvas>
@@ -208,6 +208,6 @@ const BASE_URL = '<?= BASE_URL ?>';
 const QR_DATA  = '<?= $qrData ?>';
 const UNLOCK_DATE = '<?= $unlockDate ?>';
 </script>
-<script src="<?= BASE_URL ?>/assets/js/portal.js"></script>
+<script src="/assets/js/portal.js"></script>
 </body>
 </html>

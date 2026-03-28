@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <title>Admin Login — E-Invitation</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;1,400&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/admin.css">
+<link rel="stylesheet" href="/assets/css/admin.css">
 </head>
 <body class="login-body">
 <canvas id="particleCanvas"></canvas>
@@ -74,6 +74,6 @@ function togglePwd() {
     else { inp.type = 'password'; ico.className = 'fas fa-eye'; }
 }
 </script>
-<script src="<?= BASE_URL ?>/assets/js/particles-mini.js"></script>
+<script src="/assets/js/particles-mini.js"></script>
 </body>
 </html>
