@@ -4,7 +4,8 @@
     { "src": "*.php",              "use": "vercel-php@0.7.2" },
     { "src": "admin/*.php",        "use": "vercel-php@0.7.2" },
     { "src": "api/*.php",          "use": "vercel-php@0.7.2" },
-    { "src": "admin/partials/*.php","use": "vercel-php@0.7.2" }
+    { "src": "admin/partials/*.php", "use": "vercel-php@0.7.2" },
+    { "src": "includes/*.php",       "use": "vercel-php@0.7.2" }
   ],
   "routes": [
     { "src": "/admin/?$",         "dest": "/admin/index.php" },

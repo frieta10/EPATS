@@ -50,7 +50,7 @@ if ($guestToken) {
 
 // Check for duplicate (same name + email within 10 min)
 if ($email) {
-    $dup = $db->prepare('SELECT id FROM rsvp_responses WHERE email = ? AND created_at > DATE_SUB(NOW(), INTERVAL 10 MINUTE)');
+    $dup = $db->prepare("SELECT id FROM rsvp_responses WHERE email = ? AND created_at > NOW() - INTERVAL '10 minutes'");
     $dup->execute([$email]);
     if ($dup->fetch()) {
         echo json_encode(['error' => 'You have already submitted an RSVP recently.']);
@@ -77,12 +77,13 @@ try {
             (guest_id, name, email, phone, attending, plus_one, plus_one_name,
              dietary_requirements, message, city, country, qr_token)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        RETURNING id
     ');
     $stmt->execute([
         $guestId, $name, $email, $phone, $attending, $plusOne, $plusOneName,
         $dietary, $message, $city, $country, $qrToken
     ]);
-    $rsvpId = $db->lastInsertId();
+    $rsvpId = $stmt->fetchColumn();
 
     // Time capsule
     if ($capsuleMsg) {
@@ -98,7 +99,7 @@ try {
 
     // Update guest status
     if ($guestId) {
-        $db->prepare("UPDATE guests SET notes = CONCAT(IFNULL(notes,''), ' [RSVP: ', ?, ']') WHERE id = ?")
+        $db->prepare("UPDATE guests SET notes = COALESCE(notes, '') || ' [RSVP: ' || ? || ']' WHERE id = ?")
            ->execute([$attending, $guestId]);
     }
 

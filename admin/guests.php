@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
         $handle = fopen($_FILES['csv']['tmp_name'], 'r');
         $header = fgetcsv($handle); // skip header
         $count  = 0;
-        $stmt   = $db->prepare('INSERT IGNORE INTO guests (name, email, phone, invite_token) VALUES (?, ?, ?, ?)');
+        $stmt   = $db->prepare('INSERT INTO guests (name, email, phone, invite_token) VALUES (?, ?, ?, ?) ON CONFLICT (invite_token) DO NOTHING');
         while (($row = fgetcsv($handle)) !== false) {
             $n = trim($row[0] ?? '');
             $e = trim($row[1] ?? '');
