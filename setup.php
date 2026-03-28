@@ -15,6 +15,7 @@ if (file_exists($envFile)) {
     }
 }
 
+define('IS_VERCEL',  (bool) getenv('VERCEL'));
 define('DB_HOST',    getenv('POSTGRES_HOST')    ?: getenv('DB_HOST')    ?: 'localhost');
 define('DB_PORT',    getenv('DB_PORT')           ?: '5432');
 define('DB_USER',    getenv('POSTGRES_USER')     ?: getenv('DB_USER')    ?: 'postgres');
