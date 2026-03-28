@@ -5,12 +5,16 @@
 // ============================================================
 
 // ── Database (PostgreSQL) ─────────────────────────────────
-define('DB_HOST',    getenv('DB_HOST')     ?: 'localhost');
-define('DB_PORT',    getenv('DB_PORT')     ?: '5432');
-define('DB_USER',    getenv('DB_USER')     ?: 'postgres');
-define('DB_PASS',    getenv('DB_PASS')     ?: '');
-define('DB_NAME',    getenv('DB_NAME')     ?: 'e_invitation');
-define('DB_SSLMODE', getenv('DB_SSLMODE')  ?: 'prefer'); // use 'require' for Neon/Supabase
+// Supports Vercel native POSTGRES_* vars (auto-injected by Vercel Storage)
+// OR manual DB_* vars set in Vercel env settings
+define('DB_HOST',    getenv('POSTGRES_HOST')     ?: getenv('DB_HOST')     ?: 'localhost');
+define('DB_PORT',    getenv('DB_PORT')            ?: '5432');
+define('DB_USER',    getenv('POSTGRES_USER')      ?: getenv('DB_USER')     ?: 'postgres');
+define('DB_PASS',    getenv('POSTGRES_PASSWORD')  ?: getenv('DB_PASS')     ?: '');
+define('DB_NAME',    getenv('POSTGRES_DATABASE')  ?: getenv('DB_NAME')     ?: 'e_invitation');
+define('DB_SSLMODE', getenv('DB_SSLMODE')         ?: 'require');
+// Full connection URL (Vercel Postgres injects this automatically)
+define('POSTGRES_URL_NON_POOLING', getenv('POSTGRES_URL_NON_POOLING') ?: '');
 
 // ── Base URL ──────────────────────────────────────────────
 // Vercel sets VERCEL_URL automatically (without protocol)
@@ -59,11 +63,23 @@ function getDB(): PDO {
     static $pdo = null;
     if ($pdo === null) {
         try {
-            $dsn = sprintf(
-                'pgsql:host=%s;port=%s;dbname=%s;sslmode=%s',
-                DB_HOST, DB_PORT, DB_NAME, DB_SSLMODE
-            );
-            $pdo = new PDO($dsn, DB_USER, DB_PASS, [
+            // Prefer full connection URL when Vercel Storage injects it
+            if (POSTGRES_URL_NON_POOLING) {
+                $parsed = parse_url(POSTGRES_URL_NON_POOLING);
+                $dsn = sprintf(
+                    'pgsql:host=%s;port=%s;dbname=%s;sslmode=require',
+                    $parsed['host'],
+                    $parsed['port'] ?? 5432,
+                    ltrim($parsed['path'] ?? '/neondb', '/')
+                );
+                $user = $parsed['user'] ?? DB_USER;
+                $pass = $parsed['pass'] ?? DB_PASS;
+            } else {
+                $dsn  = sprintf('pgsql:host=%s;port=%s;dbname=%s;sslmode=%s', DB_HOST, DB_PORT, DB_NAME, DB_SSLMODE);
+                $user = DB_USER;
+                $pass = DB_PASS;
+            }
+            $pdo = new PDO($dsn, $user, $pass, [
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES   => false,

@@ -15,22 +15,30 @@ if (file_exists($envFile)) {
     }
 }
 
-define('DB_HOST',    getenv('DB_HOST')    ?: 'localhost');
-define('DB_PORT',    getenv('DB_PORT')    ?: '5432');
-define('DB_USER',    getenv('DB_USER')    ?: 'postgres');
-define('DB_PASS',    getenv('DB_PASS')    ?: '');
-define('DB_NAME',    getenv('DB_NAME')    ?: 'e_invitation');
-define('DB_SSLMODE', getenv('DB_SSLMODE') ?: 'prefer');
+define('DB_HOST',    getenv('POSTGRES_HOST')    ?: getenv('DB_HOST')    ?: 'localhost');
+define('DB_PORT',    getenv('DB_PORT')           ?: '5432');
+define('DB_USER',    getenv('POSTGRES_USER')     ?: getenv('DB_USER')    ?: 'postgres');
+define('DB_PASS',    getenv('POSTGRES_PASSWORD') ?: getenv('DB_PASS')    ?: '');
+define('DB_NAME',    getenv('POSTGRES_DATABASE') ?: getenv('DB_NAME')    ?: 'e_invitation');
+define('DB_SSLMODE', getenv('DB_SSLMODE')        ?: 'require');
+define('POSTGRES_URL_NON_POOLING', getenv('POSTGRES_URL_NON_POOLING') ?: '');
 
 $log = [];
 $ok  = true;
 
 try {
-    $dsn = sprintf(
-        'pgsql:host=%s;port=%s;dbname=%s;sslmode=%s',
-        DB_HOST, DB_PORT, DB_NAME, DB_SSLMODE
-    );
-    $pdo = new PDO($dsn, DB_USER, DB_PASS, [
+    if (POSTGRES_URL_NON_POOLING) {
+        $parsed = parse_url(POSTGRES_URL_NON_POOLING);
+        $dsn  = sprintf('pgsql:host=%s;port=%s;dbname=%s;sslmode=require',
+            $parsed['host'], $parsed['port'] ?? 5432, ltrim($parsed['path'] ?? '/neondb', '/'));
+        $dbUser = $parsed['user'] ?? DB_USER;
+        $dbPass = $parsed['pass'] ?? DB_PASS;
+    } else {
+        $dsn    = sprintf('pgsql:host=%s;port=%s;dbname=%s;sslmode=%s', DB_HOST, DB_PORT, DB_NAME, DB_SSLMODE);
+        $dbUser = DB_USER;
+        $dbPass = DB_PASS;
+    }
+    $pdo = new PDO($dsn, $dbUser, $dbPass, [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     ]);
     $pdo->exec("SET client_encoding TO 'UTF8'");
