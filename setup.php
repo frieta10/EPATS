@@ -93,7 +93,7 @@ try {
 
 // ── Detect base URL for buttons ──────────────────────────────
 $vercelUrl = getenv('VERCEL_URL');
-$baseUrl   = $vercelUrl ? 'https://' . $vercelUrl : '/';
+$baseUrl   = $vercelUrl ? 'https://' . $vercelUrl : '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -159,8 +159,8 @@ $baseUrl   = $vercelUrl ? 'https://' . $vercelUrl : '/';
 
     <div class="actions">
         <?php if ($ok): ?>
-        <a href="<?= $baseUrl ?>" class="btn btn-primary">🎉 View Invitation</a>
-        <a href="<?= $baseUrl ?>admin/" class="btn btn-outline">🔒 Admin Portal</a>
+        <a href="<?= $baseUrl ?>/" class="btn btn-primary">🎉 View Invitation</a>
+        <a href="<?= $baseUrl ?>/admin/" class="btn btn-outline">🔒 Admin Portal</a>
         <?php else: ?>
         <a href="setup.php" class="btn btn-primary">↺ Retry Setup</a>
         <?php endif; ?>
