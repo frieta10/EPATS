@@ -1,15 +1,18 @@
 {
   "version": 2,
-  "functions": {
-    "**/*.php": {
-      "runtime": "vercel-php@0.7.2"
-    }
-  },
-  "rewrites": [
-    { "source": "/admin",         "destination": "/admin/index.php" },
-    { "source": "/admin/",        "destination": "/admin/index.php" },
-    { "source": "/guest-portal",  "destination": "/guest-portal.php" },
-    { "source": "/setup",         "destination": "/setup.php" },
-    { "source": "/",              "destination": "/index.php" }
+  "builds": [
+    { "src": "*.php",              "use": "vercel-php@0.7.2" },
+    { "src": "admin/*.php",        "use": "vercel-php@0.7.2" },
+    { "src": "api/*.php",          "use": "vercel-php@0.7.2" },
+    { "src": "admin/partials/*.php","use": "vercel-php@0.7.2" }
+  ],
+  "routes": [
+    { "src": "/admin/?$",         "dest": "/admin/index.php" },
+    { "src": "/guest-portal/?$",  "dest": "/guest-portal.php" },
+    { "src": "/setup/?$",         "dest": "/setup.php" },
+    { "src": "/(.*\\.php.*)",     "dest": "/$1" },
+    { "src": "/assets/(.*)",      "dest": "/assets/$1" },
+    { "src": "/uploads/(.*)",     "dest": "/uploads/$1" },
+    { "src": "/$",                "dest": "/index.php" }
   ]
 }
