@@ -103,7 +103,7 @@ $revealed = $db->query('SELECT COUNT(*) FROM time_capsule WHERE is_revealed = 1'
             <div class="wish-body">
                 <blockquote><?= nl2br(e($wish['message'])) ?></blockquote>
                 <?php if ($wish['photo_path']): ?>
-                <img src="<?= UPLOAD_URL . e($wish['photo_path']) ?>" class="wish-photo" alt="Wish photo">
+                <img src="<?= e(getImageUrl($wish['photo_path'])) ?>" class="wish-photo" alt="Wish photo">
                 <?php endif; ?>
             </div>
             <?php else: ?>

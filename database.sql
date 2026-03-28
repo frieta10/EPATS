@@ -137,8 +137,18 @@ INSERT INTO settings (setting_key, setting_value) VALUES
 ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value);
 
 -- ============================================================
--- Default Admin User (password: admin123)
+-- Default Admin User (password set dynamically by setup.php)
 -- ============================================================
 INSERT INTO admin_users (username, password_hash) VALUES
 ('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi')
 ON DUPLICATE KEY UPDATE username = username;
+
+-- ============================================================
+-- PHP Sessions table (required for Vercel / serverless)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS php_sessions (
+    session_id   VARCHAR(128) PRIMARY KEY,
+    session_data LONGTEXT     NOT NULL,
+    expires_at   DATETIME     NOT NULL,
+    INDEX idx_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

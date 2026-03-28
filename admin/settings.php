@@ -302,7 +302,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="settings-section">
             <h3 class="settings-section-title"><i class="fas fa-image"></i> Cover / Hero Photo</h3>
             <?php if ($s['cover_photo']): ?>
-            <img src="<?= UPLOAD_URL . e($s['cover_photo']) ?>" class="settings-photo-preview" alt="Cover">
+            <img src="<?= e(getImageUrl($s['cover_photo'])) ?>" class="settings-photo-preview" alt="Cover">
             <?php endif; ?>
             <form method="POST" enctype="multipart/form-data" class="upload-form">
                 <input type="hidden" name="action" value="upload_photo">
@@ -318,7 +318,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="settings-section">
             <h3 class="settings-section-title"><i class="fas fa-camera"></i> Couple Photo</h3>
             <?php if ($s['couple_photo']): ?>
-            <img src="<?= UPLOAD_URL . e($s['couple_photo']) ?>" class="settings-photo-preview" alt="Couple">
+            <img src="<?= e(getImageUrl($s['couple_photo'])) ?>" class="settings-photo-preview" alt="Couple">
             <?php endif; ?>
             <form method="POST" enctype="multipart/form-data" class="upload-form">
                 <input type="hidden" name="action" value="upload_photo">

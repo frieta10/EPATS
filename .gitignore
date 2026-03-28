@@ -1,0 +1,17 @@
+# Environment secrets — NEVER commit this
+.env
+.env.local
+
+# Local uploads (use Cloudinary in production)
+uploads/*
+!uploads/.htaccess
+!uploads/.gitkeep
+
+# IDE / OS
+.idea/
+.vscode/
+*.DS_Store
+Thumbs.db
+
+# Vercel local config
+.vercel/

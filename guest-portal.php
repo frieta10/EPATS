@@ -153,7 +153,7 @@ $qrData    = BASE_URL . '/guest-portal.php?token=' . $token;
         <div class="capsule-message revealed">
             <blockquote><?= nl2br(e($capsule['message'])) ?></blockquote>
             <?php if ($capsule['photo_path']): ?>
-            <img src="<?= UPLOAD_URL . e($capsule['photo_path']) ?>" class="capsule-photo" alt="Capsule photo">
+            <img src="<?= e(getImageUrl($capsule['photo_path'])) ?>" class="capsule-photo" alt="Capsule photo">
             <?php endif; ?>
         </div>
         <?php else: ?>

@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "functions": {
+    "**/*.php": {
+      "runtime": "vercel-php@0.7.2"
+    }
+  },
+  "rewrites": [
+    { "source": "/admin",         "destination": "/admin/index.php" },
+    { "source": "/admin/",        "destination": "/admin/index.php" },
+    { "source": "/guest-portal",  "destination": "/guest-portal.php" },
+    { "source": "/setup",         "destination": "/setup.php" },
+    { "source": "/",              "destination": "/index.php" }
+  ]
+}

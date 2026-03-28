@@ -1,28 +1,54 @@
 <?php
 // ============================================================
 // E-Invitation Platform Configuration
+// Supports both local (Laragon) and Vercel deployments
 // ============================================================
 
-define('DB_HOST', 'localhost');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_NAME', 'e_invitation');
+// ── Database ──────────────────────────────────────────────
+define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
+define('DB_USER', getenv('DB_USER') ?: 'root');
+define('DB_PASS', getenv('DB_PASS') ?: '');
+define('DB_NAME', getenv('DB_NAME') ?: 'e_invitation');
 
-// Detect base URL automatically
-$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-$host     = $_SERVER['HTTP_HOST'] ?? 'localhost';
-$script   = dirname($_SERVER['SCRIPT_NAME'] ?? '/');
-// Walk up to find E-Invitation root
-$baseDir  = '';
-$parts    = explode('/', trim($script, '/'));
-foreach ($parts as $part) {
-    $baseDir .= '/' . $part;
-    if (strtolower($part) === 'e-invitation') break;
+// ── Base URL ──────────────────────────────────────────────
+// Vercel sets VERCEL_URL automatically (without protocol)
+$_vercelUrl = getenv('VERCEL_URL');
+$_appUrl    = getenv('APP_URL');
+
+if ($_appUrl) {
+    // Explicit override takes priority
+    define('BASE_URL', rtrim($_appUrl, '/'));
+} elseif ($_vercelUrl) {
+    // Running on Vercel
+    define('BASE_URL', 'https://' . $_vercelUrl);
+} else {
+    // Local development (Laragon)
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host     = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $script   = dirname($_SERVER['SCRIPT_NAME'] ?? '/');
+    $baseDir  = '';
+    $parts    = explode('/', trim($script, '/'));
+    foreach ($parts as $part) {
+        if (empty($part)) continue;
+        $baseDir .= '/' . $part;
+        if (in_array(strtolower($part), ['epats', 'e-invitation'])) break;
+    }
+    define('BASE_URL', $protocol . '://' . $host . $baseDir);
 }
-define('BASE_URL', $protocol . '://' . $host . $baseDir);
+
+// ── Upload paths ──────────────────────────────────────────
 define('UPLOAD_PATH', __DIR__ . '/uploads/');
-define('UPLOAD_URL', BASE_URL . '/uploads/');
-define('ADMIN_PATH', __DIR__ . '/admin/');
+define('UPLOAD_URL',  BASE_URL . '/uploads/');
+define('ADMIN_PATH',  __DIR__ . '/admin/');
+
+// ── Vercel detection ──────────────────────────────────────
+define('IS_VERCEL', (bool) getenv('VERCEL'));
+
+// ============================================================
+// Load helpers
+// ============================================================
+require_once __DIR__ . '/includes/cloudinary.php';
+require_once __DIR__ . '/includes/db_session.php';
 
 // ============================================================
 // Database Connection (singleton)
@@ -43,14 +69,14 @@ function getDB(): PDO {
             );
         } catch (PDOException $e) {
             http_response_code(500);
-            die('<div style="font-family:sans-serif;padding:40px;text-align:center;"><h2>Database Error</h2><p>Could not connect to the database. Please run <code>database.sql</code> first.</p><pre>' . htmlspecialchars($e->getMessage()) . '</pre></div>');
+            die('<div style="font-family:sans-serif;padding:40px;text-align:center;"><h2>Database Error</h2><p>Could not connect to the database. Please check your environment variables or run <code>setup.php</code> first.</p><pre>' . htmlspecialchars($e->getMessage()) . '</pre></div>');
         }
     }
     return $pdo;
 }
 
 // ============================================================
-// Get all settings as key => value array
+// Settings helpers
 // ============================================================
 function getSettings(): array {
     static $cache = null;
@@ -66,29 +92,28 @@ function getSettings(): array {
 }
 
 function setting(string $key, string $default = ''): string {
-    $s = getSettings();
-    return $s[$key] ?? $default;
+    return getSettings()[$key] ?? $default;
 }
 
 // ============================================================
-// Generate cryptographically secure token
+// Token generator
 // ============================================================
 function generateToken(int $length = 32): string {
     return bin2hex(random_bytes($length));
 }
 
 // ============================================================
-// Sanitize HTML output
+// HTML sanitiser
 // ============================================================
 function e(string $str): string {
     return htmlspecialchars($str, ENT_QUOTES, 'UTF-8');
 }
 
 // ============================================================
-// Admin session check
+// Admin session guard
 // ============================================================
 function requireAdmin(): void {
-    if (session_status() === PHP_SESSION_NONE) session_start();
+    startDbSession();
     if (empty($_SESSION['admin_logged_in'])) {
         header('Location: ' . BASE_URL . '/admin/login.php');
         exit;
@@ -96,18 +121,38 @@ function requireAdmin(): void {
 }
 
 // ============================================================
+// Image URL resolver
+// Works with both legacy filenames and full Cloudinary URLs
+// ============================================================
+function getImageUrl(string $value): string {
+    if (empty($value)) return '';
+    if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
+        return $value; // Already a full URL (Cloudinary)
+    }
+    return UPLOAD_URL . $value; // Legacy local filename
+}
+
+// ============================================================
 // Upload helper
+// Uses Cloudinary when env vars are present, local disk otherwise
 // ============================================================
 function handleUpload(array $file, string $prefix = 'img'): ?string {
-    $allowed  = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    $maxSize  = 10 * 1024 * 1024; // 10 MB
+    $allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    $maxSize = 10 * 1024 * 1024; // 10 MB
 
-    if ($file['error'] !== UPLOAD_ERR_OK) return null;
-    if (!in_array($file['type'], $allowed))  return null;
-    if ($file['size'] > $maxSize)            return null;
+    if ($file['error'] !== UPLOAD_ERR_OK)        return null;
+    if (!in_array($file['type'], $allowed))       return null;
+    if ($file['size'] > $maxSize)                 return null;
 
-    $ext      = pathinfo($file['name'], PATHINFO_EXTENSION);
-    $filename = $prefix . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . strtolower($ext);
+    // ── Cloudinary (Vercel / production) ──────────────────
+    if (cloudinaryEnabled()) {
+        $url = uploadToCloudinary($file['tmp_name'], 'epats/' . $prefix);
+        return $url; // Returns full https:// URL or null
+    }
+
+    // ── Local disk (Laragon / development) ────────────────
+    $ext      = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    $filename = $prefix . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
     $dest     = UPLOAD_PATH . $filename;
 
     if (!is_dir(UPLOAD_PATH)) mkdir(UPLOAD_PATH, 0755, true);
@@ -117,7 +162,7 @@ function handleUpload(array $file, string $prefix = 'img'): ?string {
 }
 
 // ============================================================
-// Format date nicely
+// Date formatters
 // ============================================================
 function formatDate(string $date): string {
     $ts = strtotime($date);

@@ -89,11 +89,11 @@ $photos = $db->query('SELECT * FROM gallery ORDER BY created_at DESC')->fetchAll
     <div class="gallery-grid" id="galleryGrid">
         <?php foreach ($photos as $photo): ?>
         <div class="gallery-item">
-            <img src="<?= UPLOAD_URL . e($photo['filename']) ?>" alt="<?= e($photo['caption'] ?: '') ?>" loading="lazy">
+            <img src="<?= e(getImageUrl($photo['filename'])) ?>" alt="<?= e($photo['caption'] ?: '') ?>" loading="lazy">
             <div class="gallery-overlay">
                 <p><?= e($photo['caption'] ?: $photo['original_name']) ?></p>
                 <div class="gallery-actions">
-                    <a href="<?= UPLOAD_URL . e($photo['filename']) ?>" target="_blank" class="btn-icon-sm"><i class="fas fa-expand"></i></a>
+                    <a href="<?= e(getImageUrl($photo['filename'])) ?>" target="_blank" class="btn-icon-sm"><i class="fas fa-expand"></i></a>
                     <a href="?delete=<?= $photo['id'] ?>" class="btn-icon-sm btn-danger" onclick="return confirm('Delete photo?')"><i class="fas fa-trash"></i></a>
                 </div>
             </div>

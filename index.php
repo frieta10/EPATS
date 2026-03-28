@@ -27,8 +27,8 @@ $eventDay   = date('d', $eventTs);
 $eventMonth = strtoupper(date('M', $eventTs));
 $eventYear  = date('Y', $eventTs);
 
-$coverPhoto  = !empty($s['cover_photo'])  ? UPLOAD_URL . $s['cover_photo']  : '';
-$couplePhoto = !empty($s['couple_photo']) ? UPLOAD_URL . $s['couple_photo'] : '';
+$coverPhoto  = !empty($s['cover_photo'])  ? getImageUrl($s['cover_photo'])  : '';
+$couplePhoto = !empty($s['couple_photo']) ? getImageUrl($s['couple_photo']) : '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
