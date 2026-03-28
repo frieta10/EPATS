@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php --version)",
+      "Bash(mysql --version)",
+      "Bash(gh auth:*)"
+    ]
+  }
+}
