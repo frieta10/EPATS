@@ -367,6 +367,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <!-- Photos Tab handled separately below -->
         <div class="tab-content" id="tab-photos">
+            <?php if (IS_VERCEL && !cloudinaryEnabled()): ?>
+            <div class="alert alert-warning" style="margin-bottom: 20px;">
+                <i class="fas fa-triangle-exclamation"></i>
+                <strong>Cloudinary not configured!</strong><br>
+                Photo uploads require Cloudinary on Vercel. Please add these environment variables:
+                <code>CLOUDINARY_CLOUD_NAME</code>, <code>CLOUDINARY_API_KEY</code>, <code>CLOUDINARY_API_SECRET</code>
+            </div>
+            <?php endif; ?>
             <p class="tab-note">Photo uploads use a separate form — please save settings above first, then upload photos.</p>
         </div>
 

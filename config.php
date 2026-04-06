@@ -243,6 +243,12 @@ function handleUpload(array $file, string $prefix = 'img'): ?string {
         return $url; // Returns full https:// URL or null
     }
 
+    // ── Vercel without Cloudinary ─────────────────────────
+    if (IS_VERCEL) {
+        // Cannot upload files on Vercel without Cloudinary
+        return null;
+    }
+
     // ── Local disk (Laragon / development) ────────────────
     $ext      = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
     $filename = $prefix . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
@@ -252,6 +258,16 @@ function handleUpload(array $file, string $prefix = 'img'): ?string {
     if (!move_uploaded_file($file['tmp_name'], $dest)) return null;
 
     return $filename;
+}
+
+/**
+ * Check if image uploads are available (Cloudinary configured or local writable)
+ */
+function uploadsEnabled(): bool {
+    if (IS_VERCEL) {
+        return cloudinaryEnabled();
+    }
+    return true; // Local development always works
 }
 
 // ============================================================
