@@ -57,8 +57,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$events = getEvents();
-$currentEventId = getCurrentEventId();
+$events = [];
+$currentEventId = 0;
+try {
+    $events = getEvents();
+    $currentEventId = getCurrentEventId();
+} catch (Exception $e) {
+    // Table doesn't exist yet - show empty state
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
