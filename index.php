@@ -390,7 +390,8 @@ $couplePhoto = !empty($s['couple_photo']) ? getImageUrl($s['couple_photo']) : ''
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <?php endif; ?>
 <script>
-const BASE_URL = '<?= BASE_URL ?>';
+// Use relative URL for API calls to avoid CORS issues
+const BASE_URL = '';
 const EVENT_DATE = '<?= $eventDate ?>';
 const SHOW_MAP = <?= $s['show_map'] === '1' ? 'true' : 'false' ?>;
 </script>
