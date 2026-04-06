@@ -64,28 +64,6 @@ $couplePhoto = !empty($s['couple_photo']) ? getImageUrl($s['couple_photo']) : ''
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=Montserrat:wght@300;400;500;600&family=Great+Vibes&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link rel="stylesheet" href="/assets/css/main.css">
-<style>
-:root {
-    --color-bg: <?= e($s['color_bg'] ?? '#2D0A1E') ?>;
-    --color-accent: <?= e($s['color_accent'] ?? '#C9A84C') ?>;
-    --color-text: <?= e($s['color_text'] ?? '#F5E6D0') ?>;
-}
-body {
-    background-color: var(--color-bg) !important;
-    color: var(--color-text) !important;
-}
-.accent-text, .hero__ampersand, .stat-card--gold .stat-icon,
-.event-type, .event-meta i, .guest-name, .btn-create,
-.music-toggle, .share-btn, .submit-btn, .form-actions .btn-primary {
-    color: var(--color-accent) !important;
-}
-.btn-primary, .radio-card input:checked + span,
-.music-toggle.playing, .countdown-grid .number,
-.timeline-dot, .rsvp-form .btn-submit {
-    background-color: var(--color-accent) !important;
-    color: #000 !important;
-}
-</style>
 </head>
 <body>
 
