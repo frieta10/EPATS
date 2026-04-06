@@ -11,7 +11,7 @@ $declining   = $db->query("SELECT COUNT(*) FROM rsvp_responses WHERE attending='
 $maybe       = $db->query("SELECT COUNT(*) FROM rsvp_responses WHERE attending='maybe'")->fetchColumn();
 $totalGuests = $db->query("SELECT COUNT(*) FROM guests")->fetchColumn();
 $capsules    = $db->query("SELECT COUNT(*) FROM time_capsule")->fetchColumn();
-$plusOnes    = $db->query("SELECT SUM(plus_one) FROM rsvp_responses WHERE attending='yes'")->fetchColumn();
+$plusOnes    = $db->query("SELECT SUM(CASE WHEN plus_one THEN 1 ELSE 0 END) FROM rsvp_responses WHERE attending='yes'")->fetchColumn();
 
 // Recent RSVPs
 $recent = $db->query("SELECT * FROM rsvp_responses ORDER BY created_at DESC LIMIT 10")->fetchAll();
