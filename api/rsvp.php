@@ -12,24 +12,38 @@ $db = getDB();
 
 // Get event ID from request or current event
 $eventId = null;
+$postData = print_r($_POST, true);
+error_log('RSVP POST data: ' . $postData);
+
 if (!empty($_POST['event_id'])) {
     $eventId = (int) $_POST['event_id'];
+    error_log('RSVP event_id from POST: ' . $eventId);
 } elseif (!empty($_GET['event'])) {
     // Look up event by slug
     $evt = $db->prepare('SELECT id FROM events WHERE slug = ?');
     $evt->execute([$_GET['event']]);
     $eventRow = $evt->fetch();
     if ($eventRow) $eventId = $eventRow['id'];
+    error_log('RSVP event_id from GET event param: ' . $eventId);
 }
 
 // Fallback to current event
 if (!$eventId) {
     $eventId = getCurrentEventId();
+    error_log('RSVP event_id from getCurrentEventId: ' . $eventId);
 }
 
 // Debug: Check if we have a valid event_id
 if (!$eventId) {
-    echo json_encode(['error' => 'No event selected. Please refresh the page and try again.']);
+    echo json_encode(['error' => 'No event selected. Please refresh the page and try again. (event_id missing)']);
+    exit;
+}
+
+// Verify event exists
+$evtCheck = $db->prepare('SELECT id FROM events WHERE id = ?');
+$evtCheck->execute([$eventId]);
+if (!$evtCheck->fetch()) {
+    echo json_encode(['error' => 'Invalid event. Please refresh the page.']);
     exit;
 }
 
@@ -138,6 +152,7 @@ try {
 } catch (Exception $e) {
     $db->rollBack();
     error_log('RSVP Error: ' . $e->getMessage());
+    error_log('RSVP Error trace: ' . $e->getTraceAsString());
     echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
     exit;
 }
