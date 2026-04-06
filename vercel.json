@@ -11,10 +11,11 @@
   ],
   "routes": [
     { "handle": "filesystem" },
-    { "src": "/admin/?$",        "dest": "/admin/index.php" },
-    { "src": "/guest-portal/?$", "dest": "/guest-portal.php" },
-    { "src": "/setup/?$",        "dest": "/setup.php" },
-    { "src": "/(.*\\.php.*)",    "dest": "/$1" },
-    { "src": "/$",               "dest": "/index.php" }
+    { "src": "/admin/?$",                    "dest": "/admin/index.php" },
+    { "src": "/guest-portal/?$",             "dest": "/guest-portal.php" },
+    { "src": "/setup/?$",                    "dest": "/setup.php" },
+    { "src": "/([a-z0-9-]+)/?$",             "dest": "/index.php?event=$1" },
+    { "src": "/(.*\\.php.*)",                "dest": "/$1" },
+    { "src": "/$",                           "dest": "/index.php" }
   ]
 }

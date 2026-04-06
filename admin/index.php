@@ -197,9 +197,10 @@ $byCountry = $countryStmt->fetchAll();
         <div class="invite-link-card">
             <h3><i class="fas fa-link"></i> Public Invitation Link</h3>
             <div class="copy-wrap">
-                <input type="text" id="inviteLink" value="<?= BASE_URL ?>/?event=<?= e($event['slug']) ?>" readonly>
+                <input type="text" id="inviteLink" value="<?= BASE_URL ?>/<?= e($event['slug']) ?>" readonly>
                 <button class="btn" onclick="copyLink()"><i class="fas fa-copy"></i> Copy</button>
             </div>
+            <small style="color: rgba(255,255,255,0.5); margin-top: 8px; display: block;">Short URL: /<?= e($event['slug']) ?></small>
         </div>
     </div>
 </div>

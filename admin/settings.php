@@ -202,7 +202,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <p class="page-subtitle"><?= e($event['name']) ?> — Customize every detail</p>
         </div>
         <div style="display:flex;gap:12px">
-            <a href="<?= BASE_URL ?>/?event=<?= e($event['slug']) ?>" target="_blank" class="btn btn-outline"><i class="fas fa-eye"></i> Preview</a>
+            <a href="<?= BASE_URL ?>/<?= e($event['slug']) ?>" target="_blank" class="btn btn-outline"><i class="fas fa-eye"></i> Preview</a>
         </div>
     </div>
 
