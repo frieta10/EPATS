@@ -100,13 +100,88 @@ function getSettings(): array {
     static $cache = null;
     if ($cache === null) {
         try {
-            $rows  = getDB()->query('SELECT setting_key, setting_value FROM settings')->fetchAll();
-            $cache = array_column($rows, 'setting_value', 'setting_key');
+            // Check if we're in multi-event mode (event_settings table exists)
+            $db = getDB();
+            $check = $db->query("SELECT 1 FROM pg_tables WHERE tablename = 'event_settings'");
+            if ($check && $check->fetch()) {
+                // Multi-event mode: get settings for current event
+                $eventId = getCurrentEventId();
+                $rows = $db->prepare('SELECT setting_key, setting_value FROM event_settings WHERE event_id = ?');
+                $rows->execute([$eventId]);
+                $cache = array_column($rows->fetchAll(), 'setting_value', 'setting_key');
+            } else {
+                // Legacy mode: global settings
+                $rows  = $db->query('SELECT setting_key, setting_value FROM settings')->fetchAll();
+                $cache = array_column($rows, 'setting_value', 'setting_key');
+            }
         } catch (Exception $e) {
             $cache = [];
         }
     }
     return $cache;
+}
+
+// ============================================================
+// Multi-Event helpers
+// ============================================================
+function getCurrentEventId(): int {
+    startDbSession();
+    if (!empty($_SESSION['current_event_id'])) {
+        return (int) $_SESSION['current_event_id'];
+    }
+    // Default to first active event
+    try {
+        $db = getDB();
+        $id = $db->query("SELECT id FROM events WHERE is_active = TRUE ORDER BY id LIMIT 1")->fetchColumn();
+        if ($id) {
+            $_SESSION['current_event_id'] = (int) $id;
+            return (int) $id;
+        }
+    } catch (Exception $e) {
+        // Table might not exist yet
+    }
+    return 0;
+}
+
+function setCurrentEventId(int $eventId): void {
+    startDbSession();
+    $_SESSION['current_event_id'] = $eventId;
+}
+
+function getEvents(): array {
+    try {
+        return getDB()->query("SELECT * FROM events ORDER BY created_at DESC")->fetchAll();
+    } catch (Exception $e) {
+        return [];
+    }
+}
+
+function getEvent(int $id): ?array {
+    try {
+        $stmt = getDB()->prepare("SELECT * FROM events WHERE id = ?");
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    } catch (Exception $e) {
+        return null;
+    }
+}
+
+function createEvent(string $name, string $slug, string $ceremonyType = 'Wedding'): int {
+    $db = getDB();
+    $stmt = $db->prepare("INSERT INTO events (name, slug, ceremony_type) VALUES (?, ?, ?) RETURNING id");
+    $stmt->execute([$name, $slug, $ceremonyType]);
+    return (int) $stmt->fetchColumn();
+}
+
+function deleteEvent(int $eventId): void {
+    $db = getDB();
+    // Delete event (cascades to related data)
+    $db->prepare("DELETE FROM events WHERE id = ?")->execute([$eventId]);
+    // Clear current event if it was this one
+    if (getCurrentEventId() === $eventId) {
+        unset($_SESSION['current_event_id']);
+    }
 }
 
 function setting(string $key, string $default = ''): string {

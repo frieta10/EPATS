@@ -2,7 +2,7 @@
 $currentPage = basename($_SERVER['PHP_SELF']);
 $nav = [
     ['index.php',    'fas fa-gauge-high',      'Dashboard'],
-    ['settings.php', 'fas fa-sliders',          'Invitation Settings'],
+    ['events.php',   'fas fa-calendar-star',   'My Events'],
     ['guests.php',   'fas fa-users',            'Guest List'],
     ['rsvp.php',     'fas fa-envelope-open',    'RSVP Responses'],
     ['wishes.php',   'fas fa-lock',             'Time Capsule'],

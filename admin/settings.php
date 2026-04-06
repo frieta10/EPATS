@@ -1,10 +1,74 @@
 <?php
 require_once __DIR__ . '/../config.php';
 requireAdmin();
-$s  = getSettings();
-$db = getDB();
 
+$db = getDB();
 $success = $error = '';
+
+// Get event ID from URL or use current
+$eventId = isset($_GET['event_id']) ? (int) $_GET['event_id'] : getCurrentEventId();
+$event = getEvent($eventId);
+
+// If no event found, redirect to events list
+if (!$event) {
+    header('Location: ' . BASE_URL . '/admin/events.php');
+    exit;
+}
+
+// Set this as current event
+setCurrentEventId($eventId);
+
+// Load settings for this specific event
+function getEventSettings(int $eventId): array {
+    static $cache = [];
+    if (!isset($cache[$eventId])) {
+        try {
+            $stmt = getDB()->prepare('SELECT setting_key, setting_value FROM event_settings WHERE event_id = ?');
+            $stmt->execute([$eventId]);
+            $cache[$eventId] = array_column($stmt->fetchAll(), 'setting_value', 'setting_key');
+        } catch (Exception $e) {
+            $cache[$eventId] = [];
+        }
+    }
+    return $cache[$eventId];
+}
+
+$s = getEventSettings($eventId);
+
+// Ensure default values exist
+$defaults = [
+    'ceremony_type' => 'Wedding',
+    'couple_name_1' => '',
+    'couple_name_2' => '',
+    'couple_surname_1' => '',
+    'couple_surname_2' => '',
+    'tagline' => '',
+    'event_date' => '',
+    'event_time' => '',
+    'event_timezone' => 'GMT',
+    'venue_name' => '',
+    'venue_address' => '',
+    'rsvp_phone_1' => '',
+    'rsvp_phone_2' => '',
+    'rsvp_deadline' => '',
+    'time_capsule_unlock' => '',
+    'color_bg' => '#2D0A1E',
+    'color_accent' => '#C9A84C',
+    'color_text' => '#F5E6D0',
+    'custom_message' => '',
+    'cover_photo' => '',
+    'couple_photo' => '',
+    'music_url' => '',
+    'music_autoplay' => '0',
+    'show_map' => '1',
+    'show_time_capsule' => '1',
+    'show_guest_garden' => '1',
+];
+foreach ($defaults as $key => $value) {
+    if (!isset($s[$key])) {
+        $s[$key] = $value;
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? 'settings';
@@ -17,11 +81,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'color_bg','color_accent','color_text','custom_message',
             'music_url','music_autoplay','show_map','show_time_capsule','show_guest_garden'
         ];
-        $stmt = $db->prepare('INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value');
+        
+        // Save to event_settings
+        $stmt = $db->prepare('INSERT INTO event_settings (event_id, setting_key, setting_value) VALUES (?, ?, ?) ON CONFLICT (event_id, setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value');
         foreach ($fields as $field) {
             $val = $_POST[$field] ?? '';
-            $stmt->execute([$field, $val]);
+            $stmt->execute([$eventId, $field, $val]);
         }
+        
+        // Update event table with key info
+        $eventName = trim(($_POST['couple_name_1'] ?? '') . ' & ' . ($_POST['couple_name_2'] ?? ''));
+        $db->prepare('UPDATE events SET name = ?, ceremony_type = ?, couple_name_1 = ?, couple_name_2 = ?, event_date = ?, updated_at = NOW() WHERE id = ?')
+           ->execute([
+               $eventName ?: $event['name'],
+               $_POST['ceremony_type'] ?? $event['ceremony_type'],
+               $_POST['couple_name_1'] ?? '',
+               $_POST['couple_name_2'] ?? '',
+               $_POST['event_date'] ?: null,
+               $eventId
+           ]);
+        
+        // Refresh settings
+        $s = getEventSettings($eventId);
+        $event = getEvent($eventId);
         $success = 'Settings saved successfully!';
     }
 
@@ -30,13 +112,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!empty($_FILES['photo']) && in_array($type, ['cover_photo','couple_photo'])) {
             $filename = handleUpload($_FILES['photo'], $type);
             if ($filename) {
-                $db->prepare('INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value')
-                   ->execute([$type, $filename]);
+                $db->prepare('INSERT INTO event_settings (event_id, setting_key, setting_value) VALUES (?, ?, ?) ON CONFLICT (event_id, setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value')
+                   ->execute([$eventId, $type, $filename]);
                 // Track in gallery
-                $db->prepare('INSERT INTO gallery (filename, original_name, caption, is_cover, is_couple_photo) VALUES (?, ?, ?, ?, ?)')
-                   ->execute([$filename, $_FILES['photo']['name'], ucwords(str_replace('_', ' ', $type)),
+                $db->prepare('INSERT INTO gallery (event_id, filename, original_name, caption, is_cover, is_couple_photo) VALUES (?, ?, ?, ?, ?, ?)')
+                   ->execute([$eventId, $filename, $_FILES['photo']['name'], ucwords(str_replace('_', ' ', $type)),
                               $type === 'cover_photo' ? 1 : 0, $type === 'couple_photo' ? 1 : 0]);
                 $success = 'Photo uploaded!';
+                $s = getEventSettings($eventId);
             } else {
                 $error = 'Upload failed. Ensure file is JPG/PNG/GIF/WebP under 10MB.';
             }
@@ -62,28 +145,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Current password incorrect.';
         }
     }
-
-    // Refresh settings
-    $s = getSettings();
 }
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Settings — Admin Portal</title>
+<title>Edit Event — <?= e($event['name']) ?></title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;1,400&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link rel="stylesheet" href="/assets/css/admin.css">
+<style>
+.event-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 8px;
+}
+.event-badge {
+    background: rgba(201, 168, 76, 0.15);
+    color: #C9A84C;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.back-link {
+    color: rgba(255,255,255,0.6);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    font-size: 14px;
+}
+.back-link:hover {
+    color: #C9A84C;
+}
+</style>
 </head>
 <body class="admin-body">
 <?php include __DIR__ . '/partials/sidebar.php'; ?>
 <div class="admin-main">
 <?php include __DIR__ . '/partials/topbar.php'; ?>
 <div class="admin-content">
+    <a href="events.php" class="back-link"><i class="fas fa-arrow-left"></i> Back to My Events</a>
+    
     <div class="page-header">
-        <div><h1 class="page-title">Invitation Settings</h1><p class="page-subtitle">Customise every detail of your e-invitation</p></div>
-        <a href="<?= BASE_URL ?>/" target="_blank" class="btn btn-outline"><i class="fas fa-eye"></i> Preview</a>
+        <div>
+            <div class="event-header">
+                <h1 class="page-title">Edit Event</h1>
+                <span class="event-badge"><?= e($event['ceremony_type']) ?></span>
+            </div>
+            <p class="page-subtitle"><?= e($event['name']) ?> — Customize every detail</p>
+        </div>
+        <div style="display:flex;gap:12px">
+            <a href="<?= BASE_URL ?>/?event=<?= e($event['slug']) ?>" target="_blank" class="btn btn-outline"><i class="fas fa-eye"></i> Preview</a>
+        </div>
     </div>
 
     <?php if ($success): ?><div class="alert alert-success"><i class="fas fa-check-circle"></i> <?= e($success) ?></div><?php endif; ?>
@@ -111,7 +231,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <label>Event Type</label>
                         <select name="ceremony_type">
                             <?php foreach (['Wedding','Engagement','Anniversary','Birthday','Baby Shower'] as $t): ?>
-                            <option value="<?= $t ?>" <?= $s['ceremony_type'] === $t ? 'selected' : '' ?>><?= $t ?></option>
+                            <option value="<?= $t ?>" <?= ($s['ceremony_type'] ?? '') === $t ? 'selected' : '' ?>><?= $t ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -119,7 +239,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="form-row">
                     <div class="form-group">
                         <label>Name 1 (First)</label>
-                        <input type="text" name="couple_name_1" value="<?= e($s['couple_name_1']) ?>">
+                        <input type="text" name="couple_name_1" value="<?= e($s['couple_name_1'] ?? '') ?>">
                     </div>
                     <div class="form-group">
                         <label>Name 1 (Surname)</label>
@@ -129,7 +249,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="form-row">
                     <div class="form-group">
                         <label>Name 2 (First)</label>
-                        <input type="text" name="couple_name_2" value="<?= e($s['couple_name_2']) ?>">
+                        <input type="text" name="couple_name_2" value="<?= e($s['couple_name_2'] ?? '') ?>">
                     </div>
                     <div class="form-group">
                         <label>Name 2 (Surname)</label>
@@ -138,11 +258,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
                 <div class="form-group full">
                     <label>Tagline / Subtitle</label>
-                    <input type="text" name="tagline" value="<?= e($s['tagline']) ?>">
+                    <input type="text" name="tagline" value="<?= e($s['tagline'] ?? '') ?>">
                 </div>
                 <div class="form-group full">
                     <label>Personal Message / Love Story (shown below the invitation)</label>
-                    <textarea name="custom_message" rows="4"><?= e($s['custom_message']) ?></textarea>
+                    <textarea name="custom_message" rows="4"><?= e($s['custom_message'] ?? '') ?></textarea>
                 </div>
             </div>
         </div>
@@ -154,45 +274,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="form-row">
                     <div class="form-group">
                         <label>Event Date</label>
-                        <input type="date" name="event_date" value="<?= e($s['event_date']) ?>">
+                        <input type="date" name="event_date" value="<?= e($s['event_date'] ?? '') ?>">
                     </div>
                     <div class="form-group">
                         <label>Event Time</label>
-                        <input type="text" name="event_time" value="<?= e($s['event_time']) ?>" placeholder="10:00 AM">
+                        <input type="text" name="event_time" value="<?= e($s['event_time'] ?? '') ?>" placeholder="10:00 AM">
                     </div>
                     <div class="form-group">
                         <label>Timezone</label>
-                        <input type="text" name="event_timezone" value="<?= e($s['event_timezone']) ?>" placeholder="GMT">
+                        <input type="text" name="event_timezone" value="<?= e($s['event_timezone'] ?? 'GMT') ?>" placeholder="GMT">
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label>Venue Name</label>
-                        <input type="text" name="venue_name" value="<?= e($s['venue_name']) ?>">
+                        <input type="text" name="venue_name" value="<?= e($s['venue_name'] ?? '') ?>">
                     </div>
                     <div class="form-group">
                         <label>Venue Address</label>
-                        <input type="text" name="venue_address" value="<?= e($s['venue_address']) ?>">
+                        <input type="text" name="venue_address" value="<?= e($s['venue_address'] ?? '') ?>">
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label>RSVP Phone 1</label>
-                        <input type="tel" name="rsvp_phone_1" value="<?= e($s['rsvp_phone_1']) ?>">
+                        <input type="tel" name="rsvp_phone_1" value="<?= e($s['rsvp_phone_1'] ?? '') ?>">
                     </div>
                     <div class="form-group">
                         <label>RSVP Phone 2</label>
-                        <input type="tel" name="rsvp_phone_2" value="<?= e($s['rsvp_phone_2']) ?>">
+                        <input type="tel" name="rsvp_phone_2" value="<?= e($s['rsvp_phone_2'] ?? '') ?>">
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label>RSVP Deadline</label>
-                        <input type="date" name="rsvp_deadline" value="<?= e($s['rsvp_deadline']) ?>">
+                        <input type="date" name="rsvp_deadline" value="<?= e($s['rsvp_deadline'] ?? '') ?>">
                     </div>
                     <div class="form-group">
                         <label>Time Capsule Unlock Date</label>
-                        <input type="date" name="time_capsule_unlock" value="<?= e($s['time_capsule_unlock']) ?>">
+                        <input type="date" name="time_capsule_unlock" value="<?= e($s['time_capsule_unlock'] ?? '') ?>">
                         <small>Wishes become visible to you on this date</small>
                     </div>
                 </div>
@@ -207,22 +327,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="form-group">
                         <label>Background Colour</label>
                         <div class="color-input-wrap">
-                            <input type="color" name="color_bg" value="<?= e($s['color_bg']) ?>">
-                            <input type="text" id="colorBgText" value="<?= e($s['color_bg']) ?>" class="color-text">
+                            <input type="color" name="color_bg" value="<?= e($s['color_bg'] ?? '#2D0A1E') ?>">
+                            <input type="text" id="colorBgText" value="<?= e($s['color_bg'] ?? '#2D0A1E') ?>" class="color-text">
                         </div>
                     </div>
                     <div class="form-group">
                         <label>Accent / Gold Colour</label>
                         <div class="color-input-wrap">
-                            <input type="color" name="color_accent" value="<?= e($s['color_accent']) ?>">
-                            <input type="text" id="colorAccentText" value="<?= e($s['color_accent']) ?>" class="color-text">
+                            <input type="color" name="color_accent" value="<?= e($s['color_accent'] ?? '#C9A84C') ?>">
+                            <input type="text" id="colorAccentText" value="<?= e($s['color_accent'] ?? '#C9A84C') ?>" class="color-text">
                         </div>
                     </div>
                     <div class="form-group">
                         <label>Text Colour</label>
                         <div class="color-input-wrap">
-                            <input type="color" name="color_text" value="<?= e($s['color_text']) ?>">
-                            <input type="text" id="colorTextText" value="<?= e($s['color_text']) ?>" class="color-text">
+                            <input type="color" name="color_text" value="<?= e($s['color_text'] ?? '#F5E6D0') ?>">
+                            <input type="text" id="colorTextText" value="<?= e($s['color_text'] ?? '#F5E6D0') ?>" class="color-text">
                         </div>
                     </div>
                 </div>
@@ -232,13 +352,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="form-row">
                     <div class="form-group">
                         <label>Music File URL (MP3/OGG)</label>
-                        <input type="url" name="music_url" value="<?= e($s['music_url']) ?>" placeholder="https://…/song.mp3">
+                        <input type="url" name="music_url" value="<?= e($s['music_url'] ?? '') ?>" placeholder="https://…/song.mp3">
                     </div>
                     <div class="form-group">
                         <label>Autoplay</label>
                         <select name="music_autoplay">
-                            <option value="0" <?= $s['music_autoplay'] === '0' ? 'selected' : '' ?>>No (manual toggle)</option>
-                            <option value="1" <?= $s['music_autoplay'] === '1' ? 'selected' : '' ?>>Yes</option>
+                            <option value="0" <?= ($s['music_autoplay'] ?? '0') === '0' ? 'selected' : '' ?>>No (manual toggle)</option>
+                            <option value="1" <?= ($s['music_autoplay'] ?? '0') === '1' ? 'selected' : '' ?>>Yes</option>
                         </select>
                     </div>
                 </div>
@@ -260,7 +380,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <small>Show an interactive world map of where guests are travelling from</small>
                     </div>
                     <label class="toggle-switch">
-                        <input type="checkbox" name="show_map" value="1" <?= $s['show_map'] === '1' ? 'checked' : '' ?>>
+                        <input type="checkbox" name="show_map" value="1" <?= ($s['show_map'] ?? '1') === '1' ? 'checked' : '' ?>>
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
@@ -270,7 +390,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <small>Guests leave sealed messages revealed only on the wedding day</small>
                     </div>
                     <label class="toggle-switch">
-                        <input type="checkbox" name="show_time_capsule" value="1" <?= $s['show_time_capsule'] === '1' ? 'checked' : '' ?>>
+                        <input type="checkbox" name="show_time_capsule" value="1" <?= ($s['show_time_capsule'] ?? '1') === '1' ? 'checked' : '' ?>>
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
@@ -280,7 +400,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <small>Each confirmed RSVP adds an animated flower to the garden display</small>
                     </div>
                     <label class="toggle-switch">
-                        <input type="checkbox" name="show_guest_garden" value="1" <?= $s['show_guest_garden'] === '1' ? 'checked' : '' ?>>
+                        <input type="checkbox" name="show_guest_garden" value="1" <?= ($s['show_guest_garden'] ?? '1') === '1' ? 'checked' : '' ?>>
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
@@ -301,7 +421,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div id="tab-photos-upload" style="display:none">
         <div class="settings-section">
             <h3 class="settings-section-title"><i class="fas fa-image"></i> Cover / Hero Photo</h3>
-            <?php if ($s['cover_photo']): ?>
+            <?php if (!empty($s['cover_photo'])): ?>
             <img src="<?= e(getImageUrl($s['cover_photo'])) ?>" class="settings-photo-preview" alt="Cover">
             <?php endif; ?>
             <form method="POST" enctype="multipart/form-data" class="upload-form">
@@ -317,7 +437,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
         <div class="settings-section">
             <h3 class="settings-section-title"><i class="fas fa-camera"></i> Couple Photo</h3>
-            <?php if ($s['couple_photo']): ?>
+            <?php if (!empty($s['couple_photo'])): ?>
             <img src="<?= e(getImageUrl($s['couple_photo'])) ?>" class="settings-photo-preview" alt="Couple">
             <?php endif; ?>
             <form method="POST" enctype="multipart/form-data" class="upload-form">

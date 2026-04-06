@@ -1,23 +1,58 @@
 <?php
 require_once __DIR__ . '/../config.php';
 requireAdmin();
-$s  = getSettings();
 $db = getDB();
 
-// Stats
-$totalRsvp   = $db->query("SELECT COUNT(*) FROM rsvp_responses")->fetchColumn();
-$attending   = $db->query("SELECT COUNT(*) FROM rsvp_responses WHERE attending='yes'")->fetchColumn();
-$declining   = $db->query("SELECT COUNT(*) FROM rsvp_responses WHERE attending='no'")->fetchColumn();
-$maybe       = $db->query("SELECT COUNT(*) FROM rsvp_responses WHERE attending='maybe'")->fetchColumn();
-$totalGuests = $db->query("SELECT COUNT(*) FROM guests")->fetchColumn();
-$capsules    = $db->query("SELECT COUNT(*) FROM time_capsule")->fetchColumn();
-$plusOnes    = $db->query("SELECT SUM(CASE WHEN plus_one THEN 1 ELSE 0 END) FROM rsvp_responses WHERE attending='yes'")->fetchColumn();
+// Get current event
+$eventId = getCurrentEventId();
+$event = getEvent($eventId);
+
+// If no event, redirect to create one
+if (!$event) {
+    header('Location: ' . BASE_URL . '/admin/events.php');
+    exit;
+}
+
+$s = getSettings();
+
+// Stats - filtered by event
+$statsStmt = $db->prepare("SELECT COUNT(*) FROM rsvp_responses WHERE event_id = ?");
+$statsStmt->execute([$eventId]);
+$totalRsvp = $statsStmt->fetchColumn() ?: 0;
+
+$statsStmt = $db->prepare("SELECT COUNT(*) FROM rsvp_responses WHERE event_id = ? AND attending='yes'");
+$statsStmt->execute([$eventId]);
+$attending = $statsStmt->fetchColumn() ?: 0;
+
+$statsStmt = $db->prepare("SELECT COUNT(*) FROM rsvp_responses WHERE event_id = ? AND attending='no'");
+$statsStmt->execute([$eventId]);
+$declining = $statsStmt->fetchColumn() ?: 0;
+
+$statsStmt = $db->prepare("SELECT COUNT(*) FROM rsvp_responses WHERE event_id = ? AND attending='maybe'");
+$statsStmt->execute([$eventId]);
+$maybe = $statsStmt->fetchColumn() ?: 0;
+
+$statsStmt = $db->prepare("SELECT COUNT(*) FROM guests WHERE event_id = ?");
+$statsStmt->execute([$eventId]);
+$totalGuests = $statsStmt->fetchColumn() ?: 0;
+
+$statsStmt = $db->prepare("SELECT COUNT(*) FROM time_capsule WHERE event_id = ?");
+$statsStmt->execute([$eventId]);
+$capsules = $statsStmt->fetchColumn() ?: 0;
+
+$statsStmt = $db->prepare("SELECT SUM(CASE WHEN plus_one THEN 1 ELSE 0 END) FROM rsvp_responses WHERE event_id = ? AND attending='yes'");
+$statsStmt->execute([$eventId]);
+$plusOnes = $statsStmt->fetchColumn() ?: 0;
 
 // Recent RSVPs
-$recent = $db->query("SELECT * FROM rsvp_responses ORDER BY created_at DESC LIMIT 10")->fetchAll();
+$recentStmt = $db->prepare("SELECT * FROM rsvp_responses WHERE event_id = ? ORDER BY created_at DESC LIMIT 10");
+$recentStmt->execute([$eventId]);
+$recent = $recentStmt->fetchAll();
 
 // By country
-$byCountry = $db->query("SELECT country, COUNT(*) as cnt FROM rsvp_responses WHERE country != '' GROUP BY country ORDER BY cnt DESC LIMIT 8")->fetchAll();
+$countryStmt = $db->prepare("SELECT country, COUNT(*) as cnt FROM rsvp_responses WHERE event_id = ? AND country != '' GROUP BY country ORDER BY cnt DESC LIMIT 8");
+$countryStmt->execute([$eventId]);
+$byCountry = $countryStmt->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -43,7 +78,10 @@ $byCountry = $db->query("SELECT country, COUNT(*) as cnt FROM rsvp_responses WHE
                 <h1 class="page-title">Dashboard</h1>
                 <p class="page-subtitle"><?= e($s['couple_name_1']) ?> &amp; <?= e($s['couple_name_2']) ?> — <?= e($s['ceremony_type']) ?> · <?= formatDate($s['event_date']) ?></p>
             </div>
-            <a href="<?= BASE_URL ?>/" target="_blank" class="btn btn-outline"><i class="fas fa-eye"></i> View Invitation</a>
+            <div style="display:flex;gap:12px">
+                <a href="events.php" class="btn btn-outline"><i class="fas fa-calendar-star"></i> Switch Event</a>
+                <a href="<?= BASE_URL ?>/?event=<?= e($event['slug']) ?>" target="_blank" class="btn btn-outline"><i class="fas fa-eye"></i> View Invitation</a>
+            </div>
         </div>
 
         <!-- Stat Cards -->
@@ -141,8 +179,8 @@ $byCountry = $db->query("SELECT country, COUNT(*) as cnt FROM rsvp_responses WHE
                             <td><?= e(trim($r['city'] . ', ' . $r['country'], ', ') ?: '—') ?></td>
                             <td>
                                 <?php
-                                $hasCap = $db->prepare('SELECT id FROM time_capsule WHERE rsvp_id = ?');
-                                $hasCap->execute([$r['id']]);
+                                $hasCap = $db->prepare('SELECT id FROM time_capsule WHERE rsvp_id = ? AND event_id = ?');
+                                $hasCap->execute([$r['id'], $eventId]);
                                 echo $hasCap->fetch() ? '<i class="fas fa-lock gold" title="Has wish"></i>' : '—';
                                 ?>
                             </td>
@@ -159,7 +197,7 @@ $byCountry = $db->query("SELECT country, COUNT(*) as cnt FROM rsvp_responses WHE
         <div class="invite-link-card">
             <h3><i class="fas fa-link"></i> Public Invitation Link</h3>
             <div class="copy-wrap">
-                <input type="text" id="inviteLink" value="<?= BASE_URL ?>/" readonly>
+                <input type="text" id="inviteLink" value="<?= BASE_URL ?>/?event=<?= e($event['slug']) ?>" readonly>
                 <button class="btn" onclick="copyLink()"><i class="fas fa-copy"></i> Copy</button>
             </div>
         </div>
