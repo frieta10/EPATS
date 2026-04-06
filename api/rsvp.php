@@ -10,6 +10,23 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $db = getDB();
 
+// Get event ID from request or current event
+$eventId = null;
+if (!empty($_POST['event_id'])) {
+    $eventId = (int) $_POST['event_id'];
+} elseif (!empty($_GET['event'])) {
+    // Look up event by slug
+    $evt = $db->prepare('SELECT id FROM events WHERE slug = ?');
+    $evt->execute([$_GET['event']]);
+    $eventRow = $evt->fetch();
+    if ($eventRow) $eventId = $eventRow['id'];
+}
+
+// Fallback to current event
+if (!$eventId) {
+    $eventId = getCurrentEventId();
+}
+
 // Gather fields
 $name        = trim($_POST['name'] ?? '');
 $email       = trim($_POST['email'] ?? '');
@@ -39,11 +56,11 @@ if (strpos($cityCountry, ',') !== false) {
     $city = $cityCountry;
 }
 
-// Resolve guest_id
+// Resolve guest_id (match token + event)
 $guestId = null;
-if ($guestToken) {
-    $gs = $db->prepare('SELECT id FROM guests WHERE invite_token = ?');
-    $gs->execute([$guestToken]);
+if ($guestToken && $eventId) {
+    $gs = $db->prepare('SELECT id FROM guests WHERE invite_token = ? AND event_id = ?');
+    $gs->execute([$guestToken, $eventId]);
     $g = $gs->fetch();
     if ($g) $guestId = $g['id'];
 }
@@ -74,27 +91,27 @@ $db->beginTransaction();
 try {
     $stmt = $db->prepare('
         INSERT INTO rsvp_responses
-            (guest_id, name, email, phone, attending, plus_one, plus_one_name,
+            (event_id, guest_id, name, email, phone, attending, plus_one, plus_one_name,
              dietary_requirements, message, city, country, qr_token)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING id
     ');
     $stmt->execute([
-        $guestId, $name, $email, $phone, $attending, $plusOne, $plusOneName,
+        $eventId, $guestId, $name, $email, $phone, $attending, $plusOne, $plusOneName,
         $dietary, $message, $city, $country, $qrToken
     ]);
     $rsvpId = $stmt->fetchColumn();
 
     // Time capsule
     if ($capsuleMsg) {
-        $tc = $db->prepare('INSERT INTO time_capsule (rsvp_id, guest_name, message, photo_path) VALUES (?, ?, ?, ?)');
-        $tc->execute([$rsvpId, $name, $capsuleMsg, $capsulePhoto]);
+        $tc = $db->prepare('INSERT INTO time_capsule (event_id, rsvp_id, guest_name, message, photo_path) VALUES (?, ?, ?, ?, ?)');
+        $tc->execute([$eventId, $rsvpId, $name, $capsuleMsg, $capsulePhoto]);
     }
 
     // Map pin
     if ($city || $country) {
-        $mp = $db->prepare('INSERT INTO map_pins (rsvp_id, guest_name, city, country) VALUES (?, ?, ?, ?)');
-        $mp->execute([$rsvpId, $name, $city, $country]);
+        $mp = $db->prepare('INSERT INTO map_pins (event_id, rsvp_id, guest_name, city, country) VALUES (?, ?, ?, ?, ?)');
+        $mp->execute([$eventId, $rsvpId, $name, $city, $country]);
     }
 
     // Update guest status

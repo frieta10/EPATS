@@ -1,14 +1,32 @@
 <?php
 require_once __DIR__ . '/config.php';
+
+// Get event from URL or current event
+$eventId = null;
+$eventSlug = '';
+if (!empty($_GET['event'])) {
+    $eventSlug = preg_replace('/[^a-z0-9-]/', '', $_GET['event']);
+    $evt = getDB()->prepare('SELECT id FROM events WHERE slug = ?');
+    $evt->execute([$eventSlug]);
+    $eventRow = $evt->fetch();
+    if ($eventRow) {
+        $eventId = $eventRow['id'];
+        setCurrentEventId($eventId);
+    }
+}
+if (!$eventId) {
+    $eventId = getCurrentEventId();
+}
+
 $s = getSettings();
 
-// Personalised guest token
+// Personalised guest token (for this event)
 $guestName  = '';
 $guestToken = '';
 if (!empty($_GET['token'])) {
     $token = preg_replace('/[^a-f0-9]/', '', $_GET['token']);
-    $stmt  = getDB()->prepare('SELECT name, invite_token FROM guests WHERE invite_token = ?');
-    $stmt->execute([$token]);
+    $stmt  = getDB()->prepare('SELECT name, invite_token FROM guests WHERE invite_token = ? AND event_id = ?');
+    $stmt->execute([$token, $eventId]);
     $guest = $stmt->fetch();
     if ($guest) {
         $guestName  = $guest['name'];
@@ -16,9 +34,14 @@ if (!empty($_GET['token'])) {
     }
 }
 
-// RSVP count for garden display
-$attending = getDB()->query("SELECT COUNT(*) FROM rsvp_responses WHERE attending = 'yes'")->fetchColumn();
-$total     = getDB()->query("SELECT COUNT(*) FROM rsvp_responses")->fetchColumn();
+// RSVP count for garden display (this event only)
+$attendingStmt = getDB()->prepare("SELECT COUNT(*) FROM rsvp_responses WHERE attending = 'yes' AND event_id = ?");
+$attendingStmt->execute([$eventId]);
+$attending = $attendingStmt->fetchColumn();
+
+$totalStmt = getDB()->prepare("SELECT COUNT(*) FROM rsvp_responses WHERE event_id = ?");
+$totalStmt->execute([$eventId]);
+$total = $totalStmt->fetchColumn();
 
 // Format event date parts
 $eventDate  = $s['event_date'] ?? '2024-09-30';
@@ -212,6 +235,7 @@ $couplePhoto = !empty($s['couple_photo']) ? getImageUrl($s['couple_photo']) : ''
     <div id="rsvpFormWrap" class="rsvp-form-wrap reveal-up">
         <form id="rsvpForm" class="rsvp-form">
             <input type="hidden" name="guest_token" value="<?= e($guestToken) ?>">
+            <input type="hidden" name="event_id" value="<?= (int) $eventId ?>">
 
             <div class="form-row">
                 <div class="form-group">
