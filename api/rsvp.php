@@ -80,7 +80,15 @@ $qrToken = generateToken(16);
 // Handle time capsule photo upload
 $capsulePhoto = null;
 if (!empty($_FILES['capsule_photo']) && $_FILES['capsule_photo']['error'] === UPLOAD_ERR_OK) {
+    if (!cloudinaryEnabled() && IS_VERCEL) {
+        echo json_encode(['error' => 'Photo upload requires Cloudinary to be configured. Please contact the administrator.']);
+        exit;
+    }
     $capsulePhoto = handleUpload($_FILES['capsule_photo'], 'capsule');
+    if (!$capsulePhoto && IS_VERCEL) {
+        echo json_encode(['error' => 'Failed to upload photo. Cloudinary may not be configured properly.']);
+        exit;
+    }
 }
 
 // Geocode from city/country (simple fallback — use stored coords if available)
@@ -123,7 +131,8 @@ try {
     $db->commit();
 } catch (Exception $e) {
     $db->rollBack();
-    echo json_encode(['error' => 'Could not save RSVP: ' . $e->getMessage()]);
+    error_log('RSVP Error: ' . $e->getMessage());
+    echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
     exit;
 }
 
