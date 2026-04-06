@@ -27,6 +27,12 @@ if (!$eventId) {
     $eventId = getCurrentEventId();
 }
 
+// Debug: Check if we have a valid event_id
+if (!$eventId) {
+    echo json_encode(['error' => 'No event selected. Please refresh the page and try again.']);
+    exit;
+}
+
 // Gather fields
 $name        = trim($_POST['name'] ?? '');
 $email       = trim($_POST['email'] ?? '');
